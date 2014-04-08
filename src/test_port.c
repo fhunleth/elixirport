@@ -91,7 +91,6 @@ static size_t erlcmd_try_dispatch(struct erlcmd *handler)
     if (emsg == NULL)
 	errx(EXIT_FAILURE, "erl_decode");
 
-    debug("test_port_request_handler\n");
     test_port_request_handler(emsg);
 
     erl_free_term(emsg);
@@ -146,12 +145,29 @@ void test_port_request_handler(ETERM *emsg)
     // { atom(), [term()] }
 
     ETERM *cmd = erl_element(1, emsg);
-    if (cmd == NULL)
+    ETERM *args = erl_element(2, emsg);
+    debug("test_port_request_handler: %s\n", ERL_ATOM_PTR(cmd));
+
+    if (cmd == NULL || args == NULL)
 	errx(EXIT_FAILURE, "bad request");
 
     ETERM *resp;
     if (strcmp(ERL_ATOM_PTR(cmd), "ping") == 0) {
+	debug("Pong!!!\n");
 	resp = erl_format("pong");
+    } else if (strcmp(ERL_ATOM_PTR(cmd), "add") == 0) {
+	ETERM *number1 = erl_hd(args);
+	ETERM *number2 = erl_hd(erl_tl(args));
+	if (number1 == NULL ||
+	    number2 == NULL)
+	    errx(EXIT_FAILURE, "add: didn't get 2 arguments");
+
+	int x = ERL_INT_VALUE(number1);
+	int y = ERL_INT_VALUE(number2);
+
+	debug("Adding %d + %d\n", x, y);
+
+	resp = erl_mk_int(x + y);
     } else {
 	resp = erl_format("error");
     }
@@ -159,6 +175,7 @@ void test_port_request_handler(ETERM *emsg)
 
     erl_free_term(resp);
     erl_free_term(cmd);
+    erl_free_term(args);
 }
 
 int main(int argc, char *argv[])

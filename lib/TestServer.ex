@@ -8,11 +8,19 @@ defmodule TestServer do
 		:gen_server.start_link({:local, __MODULE__}, __MODULE__, [], [])
 	end
 
+	def stop do
+		:gen_server.cast __MODULE__, :stop
+	end
+
 	def ping() do
 		:gen_server.call __MODULE__, :ping
 	end
 
-	# GenServer callbacks
+	def add(x, y) do
+		:gen_server.call __MODULE__, {:add, x, y}
+	end
+
+	# gen_server callbacks
 	def init(_args) do
     executable = :code.priv_dir(:elixirport) ++ '/test_port'
     port = Port.open({:spawn_executable, executable},
@@ -26,6 +34,16 @@ defmodule TestServer do
 		{:reply, response, state }
 	end
 
+	def handle_call({:add, x, y}, _from, state) do
+		{:ok, response} = call_port(state, :add, [x, y])
+		{:reply, response, state }
+	end
+
+	def handle_cast(:stop, state) do
+		{:stop, :normal, state}
+	end
+
+	# Private helper functions
 	defp call_port(state, command, arguments) do
 		msg = {command, arguments}
 		send state.port, {self, {:command, :erlang.term_to_binary(msg)}}
