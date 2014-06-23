@@ -1,8 +1,7 @@
 defmodule Mix.Tasks.Compile.Testport do
   @shortdoc "Compiles the test_port"
-
   def run(_) do
-    Mix.shell.info System.cmd("make priv/test_port")
+    0 = Mix.Shell.IO.cmd("make priv/test_port")
   end
 end
 

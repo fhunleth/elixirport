@@ -16,15 +16,16 @@ ERL_LDFLAGS ?= -L$(ERL_EI_LIBDIR) -lerl_interface -lei
 
 LDFLAGS ?= -lpthread
 CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter
-CC = $(CROSSCOMPILER)gcc
+CC ?= $(CROSSCOMPILER)gcc
 MIX ?= mix
 
-.PHONY: all elixir-code clean
+all: compile
 
-all: elixir-code
-
-elixir-code:
+compile:
 	$(MIX) compile
+
+test:
+	$(MIX) test
 
 %.o: %.c
 	$(CC) -c $(ERL_CFLAGS) $(CFLAGS) -o $@ $<
@@ -35,4 +36,6 @@ priv/test_port: src/test_port.o
 
 clean:
 	$(MIX) clean
-	rm -f priv/test_port
+	rm -f priv/test_port src/*.o
+
+.PHONY: all compile test clean
