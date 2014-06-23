@@ -1,32 +1,32 @@
-defmodule TestServer do
-  use GenServer.Behaviour
+defmodule Server do
+  use GenServer
 
-  defrecord State, port: nil
+  defstruct port: nil,
+            somearg: 0
 
   # Public API
-  def start_link do
-    :gen_server.start_link({:local, __MODULE__}, __MODULE__, [], [])
+  def start_link(somearg) do
+    GenServer.start_link(__MODULE__, somearg)
   end
 
-  def stop do
-    :gen_server.cast __MODULE__, :stop
+  def stop(pid) do
+    GenServer.cast(pid, :stop)
   end
 
-  def ping() do
-    :gen_server.call __MODULE__, :ping
+  def ping(pid) do
+    GenServer.call(pid, :ping)
   end
 
-  def add(x, y) do
-    :gen_server.call __MODULE__, {:add, x, y}
+  def add(pid, x, y) do
+    GenServer.call(pid, {:add, x, y})
   end
 
   # gen_server callbacks
-  def init(_args) do
+  def init(arg) do
     executable = :code.priv_dir(:elixirport) ++ '/test_port'
     port = Port.open({:spawn_executable, executable},
     [{:packet, 2}, :use_stdio, :binary])
-    state = State.new(port: port)
-    { :ok, state }
+    { :ok, %Server{port: port, somearg: arg} }
   end
 
   def handle_call(:ping, _from, state) do

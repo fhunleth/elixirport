@@ -1,9 +1,9 @@
 defmodule Mix.Tasks.Compile.Testport do
-	@shortdoc "Compiles the test_port"
+  @shortdoc "Compiles the test_port"
 
-	def run(_) do
-		Mix.shell.info System.cmd("make priv/test_port")
-	end
+  def run(_) do
+    Mix.shell.info System.cmd("make priv/test_port")
+  end
 end
 
 defmodule Elixirport.Mixfile do
@@ -12,8 +12,8 @@ defmodule Elixirport.Mixfile do
   def project do
     [ app: :elixirport,
       version: "0.0.1",
-      elixir: "~> 0.12.5",
-			compilers: [:testport, :elixir, :app],
+      elixir: "~> 0.14.0",
+      compilers: [:testport, :elixir, :app],
       deps: deps ]
   end
 
