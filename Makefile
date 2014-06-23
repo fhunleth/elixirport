@@ -30,9 +30,9 @@ test:
 %.o: %.c
 	$(CC) -c $(ERL_CFLAGS) $(CFLAGS) -o $@ $<
 
-priv/test_port: src/test_port.o
+priv/test_port: src/erlcmd.o src/test_port.o
 	mkdir -p priv
-	$(CC) $< $(ERL_LDFLAGS) $(LDFLAGS) -o $@
+	$(CC) $^ $(ERL_LDFLAGS) $(LDFLAGS) -o $@
 
 clean:
 	$(MIX) clean
