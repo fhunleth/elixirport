@@ -17,7 +17,7 @@
 static void test_port_request_handler(const char *req, void *cookie)
 {
     // Commands are of the form {Command, Arguments}:
-    // { atom(), [term()] }
+    // { atom(), term() }
     int req_index = sizeof(uint16_t);
     if (ei_decode_version(req, &req_index, NULL) < 0)
         errx(EXIT_FAILURE, "Message version issue?");
@@ -25,7 +25,7 @@ static void test_port_request_handler(const char *req, void *cookie)
     int arity;
     if (ei_decode_tuple_header(req, &req_index, &arity) < 0 ||
             arity != 2)
-        errx(EXIT_FAILURE, "expecting 2 tuple");
+        errx(EXIT_FAILURE, "expecting {cmd, args} tuple");
 
     char cmd[MAXATOMLEN];
     if (ei_decode_atom(req, &req_index, cmd) < 0)
