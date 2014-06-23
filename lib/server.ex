@@ -35,7 +35,7 @@ defmodule Server do
   end
 
   def handle_call({:add, x, y}, _from, state) do
-    {:ok, response} = call_port(state, :add, [x, y])
+    {:ok, response} = call_port(state, :add, {x, y})
     {:reply, response, state }
   end
 

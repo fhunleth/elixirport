@@ -5,7 +5,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <erl_interface.h>
 #include <ei.h>
 
 //#define DEBUG
@@ -15,7 +14,7 @@
 #define debug(...)
 #endif
 
-void test_port_request_handler(ETERM *emsg);
+void test_port_request_handler(const char *buffer);
 
 /*
  * Erlang request/response processing
@@ -23,7 +22,7 @@ void test_port_request_handler(ETERM *emsg);
 #define ERLCMD_BUF_SIZE 1024
 struct erlcmd
 {
-    unsigned char buffer[ERLCMD_BUF_SIZE];
+    char buffer[ERLCMD_BUF_SIZE];
     size_t index;
 };
 
@@ -32,28 +31,20 @@ struct erlcmd
  */
 void erlcmd_init(struct erlcmd *handler)
 {
-    erl_init(NULL, 0);
     memset(handler, 0, sizeof(*handler));
 }
 
 /**
  * @brief Send a message back to Erlang
  */
-void erlcmd_send(ETERM *response)
+void erlcmd_send(char *response, size_t len)
 {
-    unsigned char buf[1024];
+    uint16_t be_len = htons(len - sizeof(uint16_t));
+    memcpy(response, &be_len, sizeof(be_len));
 
-    if (erl_encode(response, buf + sizeof(uint16_t)) == 0)
-	errx(EXIT_FAILURE, "erl_encode");
-
-    ssize_t len = erl_term_len(response);
-    uint16_t be_len = htons(len);
-    memcpy(buf, &be_len, sizeof(be_len));
-
-    len += sizeof(uint16_t);
-    ssize_t wrote = 0;
+    size_t wrote = 0;
     do {
-	ssize_t amount_written = write(STDOUT_FILENO, buf + wrote, len - wrote);
+	ssize_t amount_written = write(STDOUT_FILENO, response + wrote, len - wrote);
 	if (amount_written < 0) {
 	    if (errno == EINTR)
 		continue;
@@ -80,20 +71,14 @@ static size_t erlcmd_try_dispatch(struct erlcmd *handler)
     ssize_t msglen = ntohs(be_len);
     if (msglen + sizeof(uint16_t) > sizeof(handler->buffer))
 	errx(EXIT_FAILURE, "Message too long");
-    debug("Got %d bytes. Need %d\n", handler->index, msglen + sizeof(uint16_t));
+    debug("Got %d bytes. Need %d\n", (int) handler->index, (int) (msglen + sizeof(uint16_t)));
 
     // Check whether we've received the entire message
     if (msglen + sizeof(uint16_t) > handler->index)
 	return 0;
 
-    debug("erl_decode\n");
-    ETERM *emsg = erl_decode(handler->buffer + sizeof(uint16_t));
-    if (emsg == NULL)
-	errx(EXIT_FAILURE, "erl_decode");
-
-    test_port_request_handler(emsg);
-
-    erl_free_term(emsg);
+    debug("decode message\n");
+    test_port_request_handler(handler->buffer);
 
     return msglen + sizeof(uint16_t);
 }
@@ -120,7 +105,7 @@ void erlcmd_process(struct erlcmd *handler)
     }
 
     handler->index += amount_read;
-    debug("Processing %d bytes...\n", handler->index);
+    debug("Processing %d bytes...\n", (int) handler->index);
     for (;;) {
 	size_t bytes_processed = erlcmd_try_dispatch(handler);
 
@@ -139,43 +124,48 @@ void erlcmd_process(struct erlcmd *handler)
     }
 }
 
-void test_port_request_handler(ETERM *emsg)
+void test_port_request_handler(const char *req)
 {
     // Commands are of the form {Command, Arguments}:
     // { atom(), [term()] }
+    int req_index = sizeof(uint16_t);
+    if (ei_decode_version(req, &req_index, NULL) < 0)
+        errx(EXIT_FAILURE, "Message version issue?");
 
-    ETERM *cmd = erl_element(1, emsg);
-    ETERM *args = erl_element(2, emsg);
-    debug("test_port_request_handler: %s\n", ERL_ATOM_PTR(cmd));
+    int arity;
+    if (ei_decode_tuple_header(req, &req_index, &arity) < 0 ||
+            arity != 2)
+        errx(EXIT_FAILURE, "expecting 2 tuple");
 
-    if (cmd == NULL || args == NULL)
-	errx(EXIT_FAILURE, "bad request");
+    char cmd[MAXATOMLEN];
+    if (ei_decode_atom(req, &req_index, cmd) < 0)
+        errx(EXIT_FAILURE, "expecting command atom");
+    debug("test_port_request_handler: %s\n", cmd);
 
-    ETERM *resp;
-    if (strcmp(ERL_ATOM_PTR(cmd), "ping") == 0) {
+    char resp[ERLCMD_BUF_SIZE];
+    int resp_index = sizeof(uint16_t); // Space for payload size
+    ei_encode_version(resp, &resp_index);
+    if (strcmp(cmd, "ping") == 0) {
 	debug("Pong!!!\n");
-	resp = erl_format("pong");
-    } else if (strcmp(ERL_ATOM_PTR(cmd), "add") == 0) {
-	ETERM *number1 = erl_hd(args);
-	ETERM *number2 = erl_hd(erl_tl(args));
-	if (number1 == NULL ||
-	    number2 == NULL)
-	    errx(EXIT_FAILURE, "add: didn't get 2 arguments");
+        ei_encode_atom(resp, &resp_index, "pong");
+    } else if (strcmp(cmd, "add") == 0) {
+        long x;
+        long y;
 
-	int x = ERL_INT_VALUE(number1);
-	int y = ERL_INT_VALUE(number2);
+        if (ei_decode_tuple_header(req, &req_index, &arity) < 0 ||
+            arity != 2)
+           errx(EXIT_FAILURE, "add requires 2 numbers");
 
-	debug("Adding %d + %d\n", x, y);
+        if (ei_decode_long(req, &req_index, &x) < 0 ||
+            ei_decode_long(req, &req_index, &y) < 0)
+           errx(EXIT_FAILURE, "expecting long?");
 
-	resp = erl_mk_int(x + y);
-    } else {
-	resp = erl_format("error");
-    }
-    erlcmd_send(resp);
+	debug("Adding %ld + %ld\n", x, y);
+        ei_encode_long(resp, &resp_index, x + y);
+    } else
+        errx(EXIT_FAILURE, "unknown command: %s", cmd);
 
-    erl_free_term(resp);
-    erl_free_term(cmd);
-    erl_free_term(args);
+    erlcmd_send(resp, resp_index);
 }
 
 int main(int argc, char *argv[])
