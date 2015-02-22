@@ -10,8 +10,8 @@ defmodule Elixirport.Mixfile do
 
   def project do
     [ app: :elixirport,
-      version: "0.0.1",
-      elixir: "~> 0.14.0",
+      version: "0.0.2",
+      elixir: "~> 1.0.0",
       compilers: [:testport, :elixir, :app],
       deps: deps ]
   end
