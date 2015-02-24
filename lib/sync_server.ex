@@ -24,9 +24,9 @@ defmodule SyncServer do
 
   # gen_server callbacks
   def init(arg) do
-    executable = :code.priv_dir(:elixirport) ++ '/test_port'
+    executable = priv_dir <> "/test_port"
     port = Port.open({:spawn_executable, executable},
-    [{:packet, 2}, :use_stdio, :binary, :exit_status])
+      [{:args, ["arg1", "arg2"]}, {:packet, 2}, :use_stdio, :binary, :exit_status])
     { :ok, %SyncServer{port: port, somearg: arg} }
   end
 
@@ -49,6 +49,10 @@ defmodule SyncServer do
   end
 
   # Private helper functions
+  defp priv_dir() do
+    to_string(:code.priv_dir(:elixirport))
+  end
+
   defp call_port(state, command, arguments) do
     msg = {command, arguments}
     send state.port, {self, {:command, :erlang.term_to_binary(msg)}}
