@@ -1,12 +1,13 @@
-defmodule Server do
+defmodule SyncServer do
   use GenServer
 
   defstruct port: nil,
-            somearg: 0
+            somearg: 0,
+            requests: []
 
   # Public API
-  def start_link(somearg) do
-    GenServer.start_link(__MODULE__, somearg)
+  def start_link(somearg, opts \\ []) do
+    GenServer.start_link(__MODULE__, somearg, opts)
   end
 
   def stop(pid) do
@@ -25,22 +26,26 @@ defmodule Server do
   def init(arg) do
     executable = :code.priv_dir(:elixirport) ++ '/test_port'
     port = Port.open({:spawn_executable, executable},
-    [{:packet, 2}, :use_stdio, :binary])
-    { :ok, %Server{port: port, somearg: arg} }
+    [{:packet, 2}, :use_stdio, :binary, :exit_status])
+    { :ok, %SyncServer{port: port, somearg: arg} }
   end
 
   def handle_call(:ping, _from, state) do
     {:ok, response} = call_port(state, :ping, [])
-    {:reply, response, state }
+    {:reply, response, state}
   end
 
   def handle_call({:add, x, y}, _from, state) do
     {:ok, response} = call_port(state, :add, {x, y})
-    {:reply, response, state }
+    {:reply, response, state}
   end
 
   def handle_cast(:stop, state) do
     {:stop, :normal, state}
+  end
+
+  def handle_info({_, {:exit_status, _}}, state) do
+    {:stop, :unexpected_exit, state}
   end
 
   # Private helper functions

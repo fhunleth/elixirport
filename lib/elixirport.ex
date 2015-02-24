@@ -8,7 +8,8 @@ defmodule Elixirport do
 
     children = [
       # Define workers and child supervisors to be supervised
-      worker(Server, [:an_argument])
+      worker(SyncServer, [[:an_argument], [name: MySyncServer]]),
+      worker(AsyncServer, [[:an_argument], [name: MyAsyncServer]])
     ]
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
